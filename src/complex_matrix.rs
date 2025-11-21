@@ -1,8 +1,22 @@
 use num::{Complex, complex::ComplexFloat};
 
+#[derive(Clone)]
 pub struct ComplexMatrix {
 	values: Vec<Complex<f64>>,
 	size_side: usize,
+}
+
+impl std::fmt::Debug for ComplexMatrix {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		writeln!(f)?;
+		for i in 0..self.size_side {
+			for j in 0..self.size_side {
+				write!(f, "{}+{}i ", self[(i, j)].re(), self[(i, j)].im())?;
+			}
+			writeln!(f)?;
+		}
+		return Ok(());
+	}
 }
 
 impl ComplexMatrix {
@@ -54,6 +68,37 @@ impl std::ops::Index<(usize, usize)> for ComplexMatrix {
 impl std::ops::IndexMut<(usize, usize)> for ComplexMatrix {
 	fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
 		return &mut self.values[index.1 * self.size_side + index.0];
+	}
+}
+
+// TODO: One add operation for with/without references
+impl std::ops::Add<ComplexMatrix> for ComplexMatrix {
+	type Output = ComplexMatrix;
+
+	fn add(self, rhs: ComplexMatrix) -> Self::Output {
+		assert!(self.size_side() == rhs.size_side());
+		let mut result = ComplexMatrix::zero(self.size_side());
+		for i in 0..self.size_side() {
+			for j in 0..self.size_side() {
+				result[(i, j)] = self[(i, j)] + rhs[(i, j)];
+			}
+		}
+		return result;
+	}
+}
+
+impl<'a, 'b> std::ops::Add<&'b ComplexMatrix> for &'a ComplexMatrix {
+	type Output = ComplexMatrix;
+
+	fn add(self, rhs: &'b ComplexMatrix) -> Self::Output {
+		assert!(self.size_side() == rhs.size_side());
+		let mut result = ComplexMatrix::zero(self.size_side());
+		for i in 0..self.size_side() {
+			for j in 0..self.size_side() {
+				result[(i, j)] = self[(i, j)] + rhs[(i, j)];
+			}
+		}
+		return result;
 	}
 }
 
@@ -128,13 +173,13 @@ impl ComplexMatrix {
 		return self.conjugate().transpose();
 	}
 
-	pub fn kronecker_product(&self, rhs: Self) -> Self {
-		let mut result = ComplexMatrix::zero(self.size_side.pow(4));
-		for i in 0..self.size_side {
-			for j in 0..self.size_side {
-				for k in 0..self.size_side {
-					for l in 0..self.size_side {
-						result[(i * self.size_side + k, j * self.size_side + l)] = self[(i, j)] * rhs[(k, l)];
+	pub fn kronecker_product(&self, rhs: &Self) -> Self {
+		let mut result = ComplexMatrix::zero(self.size_side() * rhs.size_side());
+		for i in 0..self.size_side() {
+			for j in 0..self.size_side() {
+				for k in 0..rhs.size_side() {
+					for l in 0..rhs.size_side() {
+						result[(i * rhs.size_side() + k, j * rhs.size_side() + l)] = self[(i, j)] * rhs[(k, l)];
 					}
 				}
 			}
@@ -143,6 +188,10 @@ impl ComplexMatrix {
 	}
 
 	pub fn approx_eq(&self, rhs: &Self, epsilon: f64) -> bool {
+		if self.size_side() != rhs.size_side() {
+			return false;
+		}
+
 		for i in 0..self.size_side {
 			for j in 0..self.size_side {
 				let difference = self[(i, j)] - rhs[(i, j)];
