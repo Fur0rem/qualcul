@@ -28,6 +28,20 @@ impl ComplexMatrix {
 
 		return result;
 	}
+
+	pub fn size_side(&self) -> usize {
+		self.size_side
+	}
+
+	pub fn identity(size_side: usize) -> Self {
+		let mut result = ComplexMatrix::zero(size_side);
+
+		for i in 0..size_side {
+			result[(i, i)] = Complex::from(1.0);
+		}
+
+		return result;
+	}
 }
 
 impl std::ops::Index<(usize, usize)> for ComplexMatrix {
@@ -43,10 +57,10 @@ impl std::ops::IndexMut<(usize, usize)> for ComplexMatrix {
 	}
 }
 
-impl std::ops::Mul<ComplexMatrix> for ComplexMatrix {
+impl<'a, 'b> std::ops::Mul<&'b ComplexMatrix> for &'a ComplexMatrix {
 	type Output = ComplexMatrix;
 
-	fn mul(self, rhs: Self) -> Self::Output {
+	fn mul(self, rhs: &'b ComplexMatrix) -> Self::Output {
 		assert!(rhs.size_side == self.size_side);
 
 		let mut result = ComplexMatrix::zero(self.size_side);
@@ -128,7 +142,7 @@ impl ComplexMatrix {
 		return result;
 	}
 
-	pub fn approx_eq(&self, rhs: Self, epsilon: f64) -> bool {
+	pub fn approx_eq(&self, rhs: &Self, epsilon: f64) -> bool {
 		for i in 0..self.size_side {
 			for j in 0..self.size_side {
 				let difference = self[(i, j)] - rhs[(i, j)];

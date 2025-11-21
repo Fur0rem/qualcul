@@ -1,2 +1,4 @@
 pub mod complex_matrix;
 pub use complex_matrix::*;
+pub mod gates;
+pub use gates::*;
