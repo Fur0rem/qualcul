@@ -1,6 +1,6 @@
 use num::Complex;
 
-use crate::{ComplexMatrix, state::Ket};
+use crate::ComplexMatrix;
 
 pub struct Gate {
 	op: ComplexMatrix,
@@ -54,7 +54,7 @@ impl Gate {
 		return Self::from(op);
 	}
 
-	pub fn controlled_adjacent(gate: &Self) -> Self {
+	pub fn controlled(gate: &Self) -> Self {
 		let size_side = gate.op.size_side() * 2;
 		let mut op = ComplexMatrix::identity(size_side);
 
@@ -67,49 +67,33 @@ impl Gate {
 		return Self::from(op);
 	}
 
-	// Controlled gate but with control and target qubits swapped
-	// TODO: Verify more thoroughly the implementation with more tests, because I'm not so sure of the formula
-	pub fn controlled_adjacent_reversed(gate: &Self) -> Self {
-		let size_side = gate.op.size_side() * 2;
-		let mut op = ComplexMatrix::identity(size_side);
+	pub fn map(gate: &Self, mappings: &[usize]) -> Self {
+		assert!(!mappings.is_empty());
 
-		for i in 0..gate.op.size_side() {
-			for j in 0..gate.op.size_side() {
-				op[(i * 2 + 1, j * 2 + 1)] = gate.op[(i, j)];
+		// Turn the matrix into a full one by filling identity on the unmapped qubits
+		let id2 = ComplexMatrix::identity(2);
+		let mut gate = gate.op.clone();
+		for _ in 0..mappings.len() - (gate.size_side() as f64).log2() as usize {
+			gate = gate.kronecker_product(&id2);
+		}
+
+		// Permute the rows and columns according to the mappings
+		let nb_qubits = mappings.len();
+		let size_side = 1 << nb_qubits;
+		let mut full_op = ComplexMatrix::identity(size_side);
+		for i in 0..size_side {
+			for j in 0..size_side {
+				let mut row = 0;
+				let mut col = 0;
+				for (k, mapping) in mappings.iter().enumerate() {
+					let bit_i = (i >> (nb_qubits - 1 - k)) & 1;
+					let bit_j = (j >> (nb_qubits - 1 - k)) & 1;
+					row |= bit_i << (mappings.len() - 1 - mapping);
+					col |= bit_j << (mappings.len() - 1 - mapping);
+				}
+				full_op[(row, col)] = gate[(i, j)];
 			}
 		}
-
-		return Self::from(op);
-	}
-
-	// https://quantumcomputing.stackexchange.com/questions/4252/how-to-derive-the-cnot-matrix-for-a-3-qubit-system-where-the-control-target-qu/4254#4254
-	pub fn controlled(gate: &Self, control_qubit: usize, target_qubit: usize, nb_qubits: usize) -> Gate {
-		assert!(control_qubit != target_qubit);
-		assert!(control_qubit < nb_qubits);
-		assert!(target_qubit < nb_qubits);
-
-		let projector_0 = Ket::base(0b0, 2).projector();
-		let projector_1 = Ket::base(0b1, 2).projector();
-		let id2 = ComplexMatrix::identity(2);
-
-		let mut terms_when_control_is_0 = vec![&id2; nb_qubits];
-		terms_when_control_is_0[control_qubit] = &projector_0;
-		terms_when_control_is_0[target_qubit] = &id2;
-
-		let mut terms_when_control_is_1 = vec![&id2; nb_qubits];
-		terms_when_control_is_1[control_qubit] = &projector_1;
-		terms_when_control_is_1[target_qubit] = &gate.as_matrix();
-
-		let mut op_projected_0 = terms_when_control_is_0[0].clone();
-		for term in &terms_when_control_is_0[1..] {
-			op_projected_0 = op_projected_0.kronecker_product(term);
-		}
-
-		let mut op_projected_1 = terms_when_control_is_1[0].clone();
-		for term in &terms_when_control_is_1[1..] {
-			op_projected_1 = op_projected_1.kronecker_product(term);
-		}
-
-		return Self::from(op_projected_0 + op_projected_1);
+		return Self::from(full_op);
 	}
 }
