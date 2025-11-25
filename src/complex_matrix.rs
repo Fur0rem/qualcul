@@ -1,6 +1,6 @@
 use num::{Complex, complex::ComplexFloat};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Default)]
 pub struct ComplexMatrix {
 	values: Vec<Complex<f64>>,
 	size_side: usize,

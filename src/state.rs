@@ -2,10 +2,12 @@ use num::{Complex, One, Zero};
 
 use crate::ComplexMatrix;
 
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Ket {
 	components: Vec<Complex<f64>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Bra {
 	components: Vec<Complex<f64>>,
 }
@@ -25,9 +27,20 @@ impl Ket {
 		assert!(a.dimension() == b.dimension());
 		let dimension = a.dimension();
 
+		let norm = (a
+			.components
+			.iter()
+			.zip(b.components.iter())
+			.map(|(x, y)| {
+				let sum = *x + *y;
+				sum.norm_sqr()
+			})
+			.sum::<f64>())
+		.sqrt();
+
 		let mut result = Vec::with_capacity(dimension);
 		for component_idx in 0..dimension {
-			result.push(Complex::from(1.0 / 2.0f64.sqrt()) * (a.components[component_idx] + b.components[component_idx]));
+			result.push(Complex::from(1.0 / norm) * (a.components[component_idx] + b.components[component_idx]));
 		}
 
 		return Self { components: result };
@@ -37,9 +50,20 @@ impl Ket {
 		assert!(a.dimension() == b.dimension());
 		let dimension = a.dimension();
 
+		let norm = (a
+			.components
+			.iter()
+			.zip(b.components.iter())
+			.map(|(x, y)| {
+				let diff = *x - *y;
+				diff.norm_sqr()
+			})
+			.sum::<f64>())
+		.sqrt();
+
 		let mut result = Vec::with_capacity(dimension);
 		for component_idx in 0..dimension {
-			result.push(Complex::from(1.0 / 2.0f64.sqrt()) * (a.components[component_idx] - b.components[component_idx]));
+			result.push(Complex::from(1.0 / norm) * (a.components[component_idx] - b.components[component_idx]));
 		}
 
 		return Self { components: result };
@@ -59,9 +83,29 @@ impl Ket {
 		return Self::sub_and_normalize(&Self::base(0b0, 2), &Self::base(0b1, 2));
 	}
 
+	pub fn bell_phi_plus() -> Self {
+		return Self::add_and_normalize(&Self::base(0b00, 4), &Self::base(0b11, 4));
+	}
+
+	pub fn bell_psi_plus() -> Self {
+		return Self::add_and_normalize(&Self::base(0b01, 4), &Self::base(0b10, 4));
+	}
+
+	pub fn bell_phi_minus() -> Self {
+		return Self::sub_and_normalize(&Self::base(0b00, 4), &Self::base(0b11, 4));
+	}
+
+	pub fn bell_psi_minus() -> Self {
+		return Self::sub_and_normalize(&Self::base(0b01, 4), &Self::base(0b10, 4));
+	}
+
 	pub fn projector(&self) -> ComplexMatrix {
 		let self_bra = self.into_bra();
 		return self * self_bra;
+	}
+
+	pub fn components(&self) -> &[Complex<f64>] {
+		&self.components
 	}
 }
 

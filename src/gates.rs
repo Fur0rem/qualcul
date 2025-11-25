@@ -2,6 +2,7 @@ use num::Complex;
 
 use crate::ComplexMatrix;
 
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Gate {
 	op: ComplexMatrix,
 }
