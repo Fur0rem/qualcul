@@ -105,3 +105,19 @@ fn fredkin() {
 	let fredkin = Gate::map(&fredkin, &[0, 1, 2]);
 	assert!(fredkin.as_matrix().approx_eq(&expected_fredkin, 1e-6));
 }
+
+#[test]
+fn t_is_sqrt_of_s() {
+	let s = Gate::s();
+	let t = Gate::t();
+	let t_squared = t.as_matrix() * t.as_matrix();
+	assert!(t_squared.approx_eq(s.as_matrix(), 1e-6));
+}
+
+#[test]
+fn s_is_sqrt_of_z() {
+	let z = Gate::z();
+	let s = Gate::s();
+	let s_squared = s.as_matrix() * s.as_matrix();
+	assert!(s_squared.approx_eq(z.as_matrix(), 1e-6));
+}

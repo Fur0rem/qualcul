@@ -120,6 +120,24 @@ impl<'a, 'b> std::ops::Mul<&'b ComplexMatrix> for &'a ComplexMatrix {
 	}
 }
 
+impl std::ops::Mul<&ComplexMatrix> for ComplexMatrix {
+	type Output = ComplexMatrix;
+
+	fn mul(self, rhs: &ComplexMatrix) -> Self::Output {
+		assert!(rhs.size_side == self.size_side);
+
+		let mut result = ComplexMatrix::zero(self.size_side);
+		for i in 0..self.size_side {
+			for j in 0..self.size_side {
+				for k in 0..self.size_side {
+					result[(i, j)] += self[(i, k)] * rhs[(k, j)];
+				}
+			}
+		}
+		return result;
+	}
+}
+
 impl std::ops::MulAssign<Complex<f64>> for ComplexMatrix {
 	fn mul_assign(&mut self, rhs: Complex<f64>) {
 		for i in 0..self.size_side {
@@ -131,6 +149,20 @@ impl std::ops::MulAssign<Complex<f64>> for ComplexMatrix {
 }
 
 impl std::ops::Mul<Complex<f64>> for ComplexMatrix {
+	type Output = ComplexMatrix;
+
+	fn mul(self, rhs: Complex<f64>) -> Self::Output {
+		let mut result = ComplexMatrix::zero(self.size_side);
+		for i in 0..self.size_side {
+			for j in 0..self.size_side {
+				result[(i, j)] = rhs * self[(i, j)];
+			}
+		}
+		return result;
+	}
+}
+
+impl std::ops::Mul<Complex<f64>> for &ComplexMatrix {
 	type Output = ComplexMatrix;
 
 	fn mul(self, rhs: Complex<f64>) -> Self::Output {
@@ -201,5 +233,19 @@ impl ComplexMatrix {
 			}
 		}
 		return true;
+	}
+
+	pub fn exp(&self, nb_terms: usize) -> Self {
+		let mut sum = ComplexMatrix::identity(self.size_side());
+		let mut current_power = ComplexMatrix::identity(self.size_side());
+		let mut current_factorial = 1;
+
+		for n in 1..=nb_terms {
+			current_factorial *= n;
+			current_power = current_power * self;
+			sum = sum + &current_power * Complex::from(1.0 / current_factorial as f64);
+		}
+
+		return sum;
 	}
 }

@@ -97,4 +97,69 @@ impl Gate {
 		}
 		return Self::from(full_op);
 	}
+
+	pub fn rx(angle: f64) -> Self {
+		let half_theta = angle / 2.0;
+		let cos_half_theta = Complex::from(half_theta.cos());
+		let minus_i_sin_half_theta = -Complex::<f64>::i() * Complex::from(half_theta.sin());
+
+		Self::from(ComplexMatrix::from(&vec![
+			vec![cos_half_theta, minus_i_sin_half_theta],
+			vec![minus_i_sin_half_theta, cos_half_theta],
+		]))
+	}
+
+	pub fn ry(angle: f64) -> Self {
+		let half_theta = angle / 2.0;
+		let cos_half_theta = Complex::from(half_theta.cos());
+		let sin_half_theta = Complex::from(half_theta.sin());
+
+		Self::from(ComplexMatrix::from(&vec![
+			vec![cos_half_theta, -sin_half_theta],
+			vec![sin_half_theta, cos_half_theta],
+		]))
+	}
+
+	pub fn rz(angle: f64) -> Self {
+		let half_theta = angle / 2.0;
+		let exp_minus_i_half_theta = Complex::<f64>::from_polar(1.0, -half_theta);
+		let exp_i_half_theta = Complex::<f64>::from_polar(1.0, half_theta);
+
+		Self::from(ComplexMatrix::from(&vec![
+			vec![exp_minus_i_half_theta, Complex::from(0.0)],
+			vec![Complex::from(0.0), exp_i_half_theta],
+		]))
+	}
+
+	pub fn phase_shift(angle: f64) -> Self {
+		let exp_i_phi: Complex<f64> = Complex::<f64>::from_polar(1.0, angle);
+
+		Self::from(ComplexMatrix::from(&vec![
+			vec![Complex::from(1.0), Complex::from(0.0)],
+			vec![Complex::from(0.0), exp_i_phi],
+		]))
+	}
+
+	pub fn s() -> Self {
+		Self::from(ComplexMatrix::from(&vec![
+			vec![Complex::from(1.0), Complex::from(0.0)],
+			vec![Complex::from(0.0), Complex::i()],
+		]))
+	}
+
+	pub fn t() -> Self {
+		let exp_i_pi_over_4: Complex<f64> = Complex::<f64>::from_polar(1.0, std::f64::consts::PI / 4.0);
+		Self::from(ComplexMatrix::from(&vec![
+			vec![Complex::from(1.0), Complex::from(0.0)],
+			vec![Complex::from(0.0), exp_i_pi_over_4],
+		]))
+	}
+
+	pub fn phase(angle: f64) -> Self {
+		let exp_i_alpha: Complex<f64> = Complex::<f64>::from_polar(1.0, angle);
+		Self::from(ComplexMatrix::from(&vec![
+			vec![exp_i_alpha, Complex::from(0.0)],
+			vec![Complex::from(0.0), exp_i_alpha],
+		]))
+	}
 }
