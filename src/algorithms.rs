@@ -27,9 +27,7 @@ pub fn qft_circuit(nb_qubits: usize) -> Circuit {
 
 	for target in 0..nb_qubits {
 		// Apply H on the target qubit:
-		let mut map_h: Vec<usize> = (0..nb_qubits).collect();
-		map_h.swap(0, target);
-		circuit = circuit.then(Gate::map(&Gate::h(), &map_h));
+		circuit = circuit.then(Gate::h().on(target));
 
 		// Apply controlled rotations from more significant qubits (control > target)
 		for control in (target + 1)..nb_qubits {
@@ -41,33 +39,14 @@ pub fn qft_circuit(nb_qubits: usize) -> Circuit {
 			]);
 			let phase_gate = Gate::from(r_k);
 
-			// Build full mapping where first entry is control, second is target, then the rest untouched.
-			let mut mapping = Vec::with_capacity(nb_qubits);
-			mapping.push(control);
-			mapping.push(target);
-			for q in 0..nb_qubits {
-				if q != control && q != target {
-					mapping.push(q);
-				}
-			}
-
-			circuit = circuit.then(Gate::map(&Gate::controlled(&phase_gate), &mapping));
+			circuit = circuit.then(phase_gate.on(target).control(vec![control]));
 		}
 	}
 
 	// Reverse qubit order by swapping pairs (i <-> n-1-i)
 	for i in 0..(nb_qubits / 2) {
-		let a = i;
-		let b = nb_qubits - 1 - i;
-		let mut mapping = Vec::with_capacity(nb_qubits);
-		mapping.push(a);
-		mapping.push(b);
-		for q in 0..nb_qubits {
-			if q != a && q != b {
-				mapping.push(q);
-			}
-		}
-		circuit = circuit.then(Gate::map(&Gate::swap(), &mapping));
+		let mirror = nb_qubits - 1 - i;
+		circuit = circuit.then(Gate::swap().on_qubits(vec![i, mirror]));
 	}
 
 	return circuit;

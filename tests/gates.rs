@@ -8,30 +8,35 @@ fn controlled_0_controls_1() {
 	expected_cx[(1, 1)] = Complex::from(1.0);
 	expected_cx[(2, 3)] = Complex::from(1.0);
 	expected_cx[(3, 2)] = Complex::from(1.0);
-	let x = Gate::x();
-	let cx = Gate::controlled(&x);
-	let cx = Gate::map(&cx, &[0, 1]);
-	assert!(cx.as_matrix().approx_eq(&expected_cx, 1e-6));
+	let cx = Gate::x().on(1).control(vec![0]).into_matrix();
+
+	dbg!(&cx);
+	dbg!(&expected_cx);
+	assert!(cx.approx_eq(&expected_cx, 1e-6));
 }
 
 #[test]
 fn controlled_1_controls_0() {
-	let cx = Gate::controlled(&Gate::x());
-	let reverse_cx = Gate::map(&cx, &[1, 0]);
-	let cx = cx.as_matrix();
-	let reverse_cx = reverse_cx.as_matrix();
+	let cx = Gate::x().on(1).control(vec![0]).into_matrix();
+	let reverse_cx = Gate::x().on(0).control(vec![1]).into_matrix();
 
 	let mut expected_reverse_cx = ComplexMatrix::zero(4);
 	expected_reverse_cx[(0, 0)] = Complex::from(1.0);
 	expected_reverse_cx[(1, 3)] = Complex::from(1.0);
 	expected_reverse_cx[(2, 2)] = Complex::from(1.0);
 	expected_reverse_cx[(3, 1)] = Complex::from(1.0);
+	dbg!(&reverse_cx);
+	dbg!(&expected_reverse_cx);
 	assert!(reverse_cx.approx_eq(&expected_reverse_cx, 1e-6));
 
-	let swap = cx * reverse_cx;
-	let swap = &swap * cx;
+	let swap = &cx * &reverse_cx;
+	let swap = &swap * &cx;
+
 	let expected_swap = Gate::swap();
 	let expected_swap = expected_swap.as_matrix();
+
+	dbg!(&swap);
+	dbg!(&expected_swap);
 	assert!(swap.approx_eq(&expected_swap, 1e-6));
 }
 
@@ -47,14 +52,12 @@ fn controlled_0_controls_2() {
 	expected_cx[(4, 5)] = Complex::from(1.0);
 	expected_cx[(7, 6)] = Complex::from(1.0);
 	expected_cx[(6, 7)] = Complex::from(1.0);
-	let x = Gate::x();
-	let cx = Gate::controlled(&x);
-	let cx = Gate::map(&cx, &[0, 2, 1]);
 
-	dbg!(&cx.as_matrix());
+	let cx = Gate::x().on(2).control(vec![0]).into_matrix();
+
+	dbg!(&cx);
 	dbg!(&expected_cx);
-
-	assert!(cx.as_matrix().approx_eq(&expected_cx, 1e-6));
+	assert!(cx.approx_eq(&expected_cx, 1e-6));
 }
 
 #[test]
@@ -69,14 +72,12 @@ fn controlled_2_controls_0() {
 	expected_cx[(5, 1)] = Complex::from(1.0);
 	expected_cx[(6, 6)] = Complex::from(1.0);
 	expected_cx[(7, 3)] = Complex::from(1.0);
-	let x = Gate::x();
-	let cx = Gate::controlled(&x);
-	let cx = Gate::map(&cx, &[2, 0, 1]);
 
-	dbg!(&cx.as_matrix());
+	let cx = Gate::x().on(0).control(vec![2]).into_matrix();
+
+	dbg!(&cx);
 	dbg!(&expected_cx);
-
-	assert!(cx.as_matrix().approx_eq(&expected_cx, 1e-6));
+	assert!(cx.approx_eq(&expected_cx, 1e-6));
 }
 
 #[test]
@@ -86,11 +87,8 @@ fn ccx() {
 	expected_ccx[(7, 6)] = Complex::from(1.0);
 	expected_ccx[(6, 6)] = Complex::from(0.0);
 	expected_ccx[(7, 7)] = Complex::from(0.0);
-	let x = Gate::x();
-	let cx = Gate::controlled(&x);
-	let ccx = Gate::controlled(&cx);
-	let ccx = Gate::map(&ccx, &[0, 1, 2]);
-	assert!(ccx.as_matrix().approx_eq(&expected_ccx, 1e-6));
+	let ccx = Gate::x().on(2).control(vec![0, 1]).into_matrix();
+	assert!(ccx.approx_eq(&expected_ccx, 1e-6));
 }
 
 #[test]
@@ -100,10 +98,8 @@ fn fredkin() {
 	expected_fredkin[(6, 5)] = Complex::from(1.0);
 	expected_fredkin[(5, 5)] = Complex::from(0.0);
 	expected_fredkin[(6, 6)] = Complex::from(0.0);
-	let swap = Gate::swap();
-	let fredkin = Gate::controlled(&swap);
-	let fredkin = Gate::map(&fredkin, &[0, 1, 2]);
-	assert!(fredkin.as_matrix().approx_eq(&expected_fredkin, 1e-6));
+	let fredkin = Gate::swap().on_qubits(vec![1, 2]).control(vec![0]).into_matrix();
+	assert!(fredkin.approx_eq(&expected_fredkin, 1e-6));
 }
 
 #[test]

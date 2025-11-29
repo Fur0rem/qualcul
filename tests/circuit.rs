@@ -1,6 +1,7 @@
 use num::Complex;
 use qualcul::{
 	ComplexMatrix, Gate,
+	backend::{Backend, Program, dense_cpu::DenseCPUBackend},
 	circuit::{Circuit, StateVector},
 	state::Ket,
 };
@@ -8,8 +9,11 @@ use qualcul::{
 #[test]
 fn epr_pair_matrix() {
 	let circuit = Circuit::new(2)
-		.then(Gate::map(&Gate::h(), &[0, 1]))
-		.then(Gate::map(&Gate::controlled(&Gate::x()), &[0, 1]));
+		.then(Gate::h().on(0))
+		.then(Gate::x().on(1).control(vec![0]));
+
+	let backend = DenseCPUBackend;
+	let circuit = backend.compile(&circuit);
 	let matrix = circuit.as_matrix().unwrap();
 
 	let mut expected_matrix = ComplexMatrix::zero(4);
@@ -23,14 +27,20 @@ fn epr_pair_matrix() {
 	expected_matrix[(3, 2)] = Complex::from(-1.0);
 	expected_matrix *= Complex::from(1.0 / 2.0f64.sqrt());
 
+	dbg!(&matrix);
+	dbg!(&expected_matrix);
 	assert!(matrix.approx_eq(&expected_matrix, 1e-6));
 }
 
 #[test]
 fn epr_pair_run() {
 	let circuit = Circuit::new(2)
-		.then(Gate::map(&Gate::h(), &[0, 1]))
-		.then(Gate::map(&Gate::controlled(&Gate::x()), &[0, 1]));
+		.then(Gate::h().on(0))
+		.then(Gate::x().on(1).control(vec![0]));
+
+	let backend = DenseCPUBackend;
+	let circuit = backend.compile(&circuit);
+
 	let initial_state = StateVector::from_ket(&Ket::base(0b00, 4));
 	let final_state = circuit.run(&initial_state);
 	let expected_state = StateVector::from_ket(&Ket::bell_phi_plus());
@@ -42,17 +52,14 @@ fn ghz_n_run() {
 	for n in 0..=5 {
 		dbg!(n);
 
-		// h on qubit 0
-		let mappings: Vec<_> = (0..=n).collect();
-		let mut circuit = Circuit::new(n + 1).then(Gate::map(&Gate::h(), &mappings));
-
+		let mut circuit = Circuit::new(n + 1).then(Gate::h().on(0));
 		// cx with qubit i controlling qubit i+1
 		for i in 0..n {
-			let mut mappings = mappings.clone();
-			mappings.swap(0, i);
-			mappings.swap(1, i + 1);
-			circuit = circuit.then(Gate::map(&Gate::controlled(&Gate::x()), &mappings));
+			circuit = circuit.then(Gate::x().on(i + 1).control(vec![i]));
 		}
+
+		let backend = DenseCPUBackend;
+		let circuit = backend.compile(&circuit);
 
 		let nb_dimensions = 2 << n; // 2^(n+1)
 		let ket_0s = Ket::base(0, nb_dimensions);

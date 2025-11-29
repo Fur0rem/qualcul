@@ -1,10 +1,15 @@
 use num::Complex;
 
-use crate::ComplexMatrix;
+use crate::{
+	ComplexMatrix,
+	backend::{Backend, dense_cpu::DenseCPUBackend},
+};
+
+use crate::circuit::Circuit;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Gate {
-	op: ComplexMatrix,
+	pub(crate) op: ComplexMatrix,
 }
 
 impl Gate {
@@ -57,49 +62,6 @@ impl Gate {
 		op[(2, 1)] = Complex::from(1.0);
 		op[(3, 3)] = Complex::from(1.0);
 		return Self::from(op);
-	}
-
-	pub fn controlled(gate: &Self) -> Self {
-		let size_side = gate.op.size_side() * 2;
-		let mut op = ComplexMatrix::identity(size_side);
-
-		for i in gate.op.size_side()..size_side {
-			for j in gate.op.size_side()..size_side {
-				op[(i, j)] = gate.op[(i - gate.op.size_side(), j - gate.op.size_side())];
-			}
-		}
-
-		return Self::from(op);
-	}
-
-	pub fn map(gate: &Self, mappings: &[usize]) -> Self {
-		assert!(!mappings.is_empty());
-
-		// Turn the matrix into a full one by filling identity on the unmapped qubits
-		let id2 = ComplexMatrix::identity(2);
-		let mut gate = gate.op.clone();
-		for _ in 0..mappings.len() - (gate.size_side() as f64).log2() as usize {
-			gate = gate.kronecker_product(&id2);
-		}
-
-		// Permute the rows and columns according to the mappings
-		let nb_qubits = mappings.len();
-		let size_side = 1 << nb_qubits;
-		let mut full_op = ComplexMatrix::identity(size_side);
-		for i in 0..size_side {
-			for j in 0..size_side {
-				let mut row = 0;
-				let mut col = 0;
-				for (k, mapping) in mappings.iter().enumerate() {
-					let bit_i = (i >> (nb_qubits - 1 - k)) & 1;
-					let bit_j = (j >> (nb_qubits - 1 - k)) & 1;
-					row |= bit_i << (mappings.len() - 1 - mapping);
-					col |= bit_j << (mappings.len() - 1 - mapping);
-				}
-				full_op[(row, col)] = gate[(i, j)];
-			}
-		}
-		return Self::from(full_op);
 	}
 
 	pub fn rx(angle: f64) -> Self {
@@ -168,11 +130,67 @@ impl Gate {
 	}
 }
 
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct GateOperation {
+	pub(crate) op: Gate,
+	pub(crate) applied_on: Vec<usize>,
+	pub(crate) controlled_by: Vec<usize>,
+}
+
+impl Gate {
+	pub fn on(self, qubit: usize) -> GateOperation {
+		GateOperation {
+			op: self,
+			applied_on: vec![qubit],
+			controlled_by: vec![],
+		}
+	}
+
+	pub fn on_qubits(self, qubits: Vec<usize>) -> GateOperation {
+		GateOperation {
+			op: self,
+			applied_on: qubits,
+			controlled_by: vec![],
+		}
+	}
+}
+
+impl GateOperation {
+	pub fn control(self, by: Vec<usize>) -> Self {
+		Self {
+			op: self.op,
+			applied_on: self.applied_on,
+			controlled_by: by,
+		}
+	}
+
+	pub fn op(&self) -> &Gate {
+		&self.op
+	}
+
+	pub fn applied_on(&self) -> &Vec<usize> {
+		&self.applied_on
+	}
+
+	pub fn controlled_by(&self) -> &Vec<usize> {
+		&self.controlled_by
+	}
+
+	pub fn into_matrix(self) -> ComplexMatrix {
+		const BACKEND: DenseCPUBackend = DenseCPUBackend;
+		let targets = self.applied_on();
+		let controls = self.controlled_by();
+		let nb_qubits = controls.iter().max().unwrap().max(targets.iter().max().unwrap()) + 1;
+		let program = BACKEND.compile(&Circuit::new(nb_qubits).then(self));
+		return program.as_matrix().unwrap().clone();
+	}
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub enum Operation {
-	Gate(Gate),     // Quantum gate
-	Measure(usize), // Measure a qubit
+pub enum QuantumOperation {
+	Gate(GateOperation), // Quantum gate
+	Measure(usize),      // Measure a qubit
 	ClassicalControl {
-		look_up_table: Vec<(Vec<(usize, u8)>, Gate)>, // Gates to apply based on classical bits
+		look_up_table: Vec<(Vec<(usize, u8)>, GateOperation)>, // Gates to apply based on classical bits
 	},
 }

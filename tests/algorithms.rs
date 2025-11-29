@@ -1,9 +1,12 @@
 use std::f64::consts::PI;
 
 use num::Complex;
+use qualcul::Gate;
 use qualcul::algorithms::{qft_circuit, qft_matrix};
+use qualcul::backend::dense_cpu::DenseCPUBackend;
+use qualcul::backend::{Backend, Program};
 use qualcul::{
-	ComplexMatrix, Gate, Operation,
+	ComplexMatrix, QuantumOperation,
 	circuit::{Circuit, StateVector},
 	state::Ket,
 };
@@ -13,25 +16,25 @@ const NB_RANDOM_TESTS: usize = 20;
 #[test]
 fn quantum_teleportation() {
 	let circuit = Circuit::new(3)
-		.then(Gate::map(&Gate::h(), &[2, 0, 1]))
-		.then(Gate::map(&Gate::controlled(&Gate::x()), &[2, 1, 0]))
-		.then(Gate::map(&Gate::controlled(&Gate::x()), &[0, 1, 2]))
-		.then(Gate::map(&Gate::h(), &[0, 1, 2]))
-		.then_op(Operation::Measure(0))
-		.then_op(Operation::Measure(1))
-		.then_op(Operation::ClassicalControl {
+		.then(Gate::h().on(2))
+		.then(Gate::x().on(1).control(vec![2]))
+		.then(Gate::x().on(1).control(vec![0]))
+		.then(Gate::h().on(0))
+		.then_op(QuantumOperation::Measure(0))
+		.then_op(QuantumOperation::Measure(1))
+		.then_op(QuantumOperation::ClassicalControl {
 			look_up_table: {
 				let mut table = Vec::new();
-				table.push((vec![(1, 0)], Gate::map(&Gate::none(), &[0, 1, 2])));
-				table.push((vec![(1, 1)], Gate::map(&Gate::x(), &[2, 0, 1])));
+				table.push((vec![(1, 0)], Gate::none().on(0)));
+				table.push((vec![(1, 1)], Gate::x().on(2)));
 				table
 			},
 		})
-		.then_op(Operation::ClassicalControl {
+		.then_op(QuantumOperation::ClassicalControl {
 			look_up_table: {
 				let mut table = Vec::new();
-				table.push((vec![(0, 0)], Gate::map(&Gate::none(), &[0, 1, 2])));
-				table.push((vec![(0, 1)], Gate::map(&Gate::z(), &[2, 0, 1])));
+				table.push((vec![(0, 0)], Gate::none().on(0)));
+				table.push((vec![(0, 1)], Gate::z().on(2)));
 				table
 			},
 		});
@@ -42,7 +45,9 @@ fn quantum_teleportation() {
 		let bob_qubit = Ket::base(0b0, 2);
 
 		let initial_state = StateVector::from_qubits(&[&alice_qubit, &shared_qubit, &bob_qubit]);
-		let final_state = circuit.run(&initial_state);
+		let backend = DenseCPUBackend;
+		let program = backend.compile(&circuit);
+		let final_state = program.run(&initial_state);
 
 		let bob_new_qubit = final_state.extract_state_of_single_qubit(2);
 
@@ -61,48 +66,53 @@ fn z_error_correction() {
 	// 3 physical qubits, 2 error correction qubits
 	let circuit = Circuit::new(5)
 		// Encode
-		.then(Gate::map(&Gate::controlled(&Gate::x()), &[0, 1, 2, 3, 4])) // 0 -> 1
-		.then(Gate::map(&Gate::controlled(&Gate::x()), &[0, 2, 1, 3, 4])) // 0 -> 2
+		.then(Gate::x().on(1).control(vec![0]))
+		.then(Gate::x().on(2).control(vec![0]))
 		// Apply h gates
-		.then(Gate::map(&Gate::h(), &[0, 1, 2, 3, 4])) // h on qubit 0
-		.then(Gate::map(&Gate::h(), &[1, 0, 2, 3, 4])) // h on qubit 1
-		.then(Gate::map(&Gate::h(), &[2, 0, 1, 3, 4])) // h on qubit 2
+		.then(Gate::h().on(0))
+		.then(Gate::h().on(1))
+		.then(Gate::h().on(2))
 		// Error (Z gates only)
-		.then(Gate::map(&Gate::z(), &[1, 0, 2, 3, 4])) // Z error on qubit 1
+		.then(Gate::z().on(1))
 		// Apply h gates again
-		.then(Gate::map(&Gate::h(), &[0, 1, 2, 3, 4])) // h on qubit 0
-		.then(Gate::map(&Gate::h(), &[1, 0, 2, 3, 4])) // h on qubit 1
-		.then(Gate::map(&Gate::h(), &[2, 0, 1, 3, 4])) // h on qubit 2
+		.then(Gate::h().on(0))
+		.then(Gate::h().on(1))
+		.then(Gate::h().on(2))
 		// Repair
-		.then(Gate::map(&Gate::controlled(&Gate::x()), &[0, 3, 1, 2, 4])) // 0 -> 3
-		.then(Gate::map(&Gate::controlled(&Gate::x()), &[1, 3, 0, 2, 4])) // 1 -> 3
-		.then(Gate::map(&Gate::controlled(&Gate::x()), &[1, 4, 0, 2, 3])) // 1 -> 4
-		.then(Gate::map(&Gate::controlled(&Gate::x()), &[2, 4, 0, 1, 3])) // 2 -> 4
-		.then_op(Operation::Measure(3)) // Measure qubit 3
-		.then_op(Operation::Measure(4)) // Measure qubit 4
-		.then_op(Operation::ClassicalControl {
+		.then(Gate::x().on(3).control(vec![0]))
+		.then(Gate::x().on(3).control(vec![1]))
+		.then(Gate::x().on(4).control(vec![1]))
+		.then(Gate::x().on(4).control(vec![2]))
+		// Catch errors
+		.then_op(QuantumOperation::Measure(3))
+		.then_op(QuantumOperation::Measure(4))
+		// Kraus operator based on the error
+		.then_op(QuantumOperation::ClassicalControl {
 			look_up_table: vec![
 				(
 					vec![(3, 0), (4, 0)],
-					Gate::map(&Gate::from(id.kronecker_product(&id).kronecker_product(&id)), &[0, 1, 2, 3, 4]),
+					Gate::from(id.kronecker_product(&id).kronecker_product(&id)).on_qubits(vec![0, 1, 2, 3, 4]),
 				),
 				(
 					vec![(3, 0), (4, 1)],
-					Gate::map(&Gate::from(id.kronecker_product(&id).kronecker_product(&x)), &[0, 1, 2, 3, 4]),
+					Gate::from(id.kronecker_product(&id).kronecker_product(&x)).on_qubits(vec![0, 1, 2, 3, 4]),
 				),
 				(
 					vec![(3, 1), (4, 0)],
-					Gate::map(&Gate::from(x.kronecker_product(&id).kronecker_product(&id)), &[0, 1, 2, 3, 4]),
+					Gate::from(x.kronecker_product(&id).kronecker_product(&id)).on_qubits(vec![0, 1, 2, 3, 4]),
 				),
 				(
 					vec![(3, 1), (4, 1)],
-					Gate::map(&Gate::from(id.kronecker_product(&x).kronecker_product(&id)), &[0, 1, 2, 3, 4]),
+					Gate::from(id.kronecker_product(&x).kronecker_product(&id)).on_qubits(vec![0, 1, 2, 3, 4]),
 				),
 			],
-		}) // Kraus operator
+		})
 		// Decode
-		.then(Gate::map(&Gate::controlled(&Gate::x()), &[0, 1, 2, 3, 4])) // 0 -> 1
-		.then(Gate::map(&Gate::controlled(&Gate::x()), &[0, 2, 1, 3, 4])); // 0 -> 2
+		.then(Gate::x().on(1).control(vec![0]))
+		.then(Gate::x().on(2).control(vec![0]));
+
+	let backend = DenseCPUBackend;
+	let program = backend.compile(&circuit);
 
 	for _ in 0..NB_RANDOM_TESTS {
 		let q0 = Ket::random(2);
@@ -111,7 +121,7 @@ fn z_error_correction() {
 		let q3 = Ket::base(0b0, 2);
 		let q4 = Ket::base(0b0, 2);
 		let initial_state = StateVector::from_qubits(&[&q0, &q1, &q2, &q3, &q4]);
-		let final_state = circuit.run(&initial_state);
+		let final_state = program.run(&initial_state);
 		let recovered_q0 = final_state.extract_state_of_single_qubit(0);
 		dbg!(&q0);
 		dbg!(&recovered_q0);
@@ -122,11 +132,17 @@ fn z_error_correction() {
 #[test]
 fn qft_1_qubit() {
 	// QFT with 1 qubit is just H
-	let given_circuit = Circuit::new(1).then(Gate::map(&Gate::h(), &[0]));
+	let given_circuit = Circuit::new(1).then(Gate::h().on(0));
 	let built_circuit = qft_circuit(1);
 	let actual_matrix = qft_matrix(1);
 
+	let backend = DenseCPUBackend;
+	let given_circuit = backend.compile(&given_circuit);
+	let built_circuit = backend.compile(&built_circuit);
+
 	dbg!(&actual_matrix);
+	dbg!(&given_circuit);
+	dbg!(&built_circuit);
 	dbg!(&given_circuit.as_matrix().unwrap());
 	dbg!(&built_circuit.as_matrix().unwrap());
 
@@ -136,105 +152,112 @@ fn qft_1_qubit() {
 
 #[test]
 fn qft_2_qubit() {
-	// 2-qubit QFT circuit:
+	let backend = DenseCPUBackend;
+	// 2-qubit QFT:
 	// - H on qubit 0
 	// - controlled R2 (control qubit 1 -> target qubit 0)
 	// - H on qubit 1
 	// - swap qubit 0 and 1
-	let mut circuit = Circuit::new(2);
-	circuit = circuit
-		// H on 0
-		.then(Gate::map(&Gate::h(), &[0, 1]))
-		// Controlled R2 (1 -> 0)
+	let given_circuit = Circuit::new(2)
+		.then(Gate::h().on(0))
 		.then({
-			let angle = 2.0 * PI / 4.0; // R2: 2pi / 2^2
+			let angle = 2.0 * PI / 4.0; // R2
 			let r2 = ComplexMatrix::from(&vec![
 				vec![Complex::from(1.0), Complex::from(0.0)],
 				vec![Complex::from(0.0), Complex::from_polar(1.0, angle)],
 			]);
-			let phase_gate = Gate::from(r2);
-			Gate::map(&Gate::controlled(&phase_gate), &[1, 0]) // 1 controls 0
+			Gate::from(r2).on(0).control(vec![1])
 		})
-		// H on 1
-		.then(Gate::map(&Gate::h(), &[1, 0]))
-		// Swap 0 <-> 1
-		.then(Gate::map(&Gate::swap(), &[0, 1]));
+		.then(Gate::h().on(1))
+		.then(Gate::swap().on_qubits(vec![0, 1]));
+	let given_program = backend.compile(&given_circuit);
 
 	let reference_matrix = qft_matrix(2);
+	let built_circuit = qft_circuit(2);
+	let built_program = backend.compile(&built_circuit);
+
+	dbg!(&built_circuit);
+	dbg!(&given_circuit);
+	assert!(built_circuit == given_circuit);
 
 	dbg!(&reference_matrix);
-	dbg!(&circuit.as_matrix().unwrap());
-	assert!(reference_matrix.approx_eq(&circuit.as_matrix().unwrap(), 1e-6));
+	dbg!(&built_program.as_matrix().unwrap());
+	dbg!(&given_program.as_matrix().unwrap());
+	assert!(reference_matrix.approx_eq(&given_program.as_matrix().unwrap(), 1e-6));
+	assert!(reference_matrix.approx_eq(&built_program.as_matrix().unwrap(), 1e-6));
 }
 
 #[test]
 fn qft_3_qubit() {
+	let backend = DenseCPUBackend;
 	// 3-qubit QFT circuit:
 	// - H on qubit 0
-	// - controlled R2 (control qubit 1 -> target qubit 0)
-	// - controlled R3 (control qubit 2 -> target qubit 0)
+	// - controlled R2 (1 -> 0)
+	// - controlled R3 (2 -> 0)
 	// - H on qubit 1
-	// - controlled R2 (control qubit 2 -> target qubit 1)
+	// - controlled R2 (2 -> 1)
 	// - H on qubit 2
-	// - swap qubit 0 and 2
-	let mut circuit = Circuit::new(3);
-	circuit = circuit
-		// H on qubit 0
-		.then(Gate::map(&Gate::h(), &[0, 1, 2]))
-		// Controlled R2: (1 -> 0)
+	// - swap 0 <-> 2
+	let given_circuit = Circuit::new(3)
+		.then(Gate::h().on(0))
 		.then({
-			let angle = 2.0 * PI / 4.0; // R2: 2pi / 2^2
+			let angle = 2.0 * PI / 4.0; // R2
 			let r2 = ComplexMatrix::from(&vec![
 				vec![Complex::from(1.0), Complex::from(0.0)],
 				vec![Complex::from(0.0), Complex::from_polar(1.0, angle)],
 			]);
-			let phase_gate = Gate::from(r2);
-			Gate::map(&Gate::controlled(&phase_gate), &[1, 0, 2]) // 1 controls 0
+			Gate::from(r2).on(0).control(vec![1])
 		})
-		// Controlled R3: (2 -> 0)
 		.then({
-			let angle = 2.0 * PI / 8.0; // R3: 2pi / 2^3
+			let angle = 2.0 * PI / 8.0; // R3
 			let r3 = ComplexMatrix::from(&vec![
 				vec![Complex::from(1.0), Complex::from(0.0)],
 				vec![Complex::from(0.0), Complex::from_polar(1.0, angle)],
 			]);
-			let phase_gate = Gate::from(r3);
-			Gate::map(&Gate::controlled(&phase_gate), &[2, 0, 1]) // 2 controls 0
+			Gate::from(r3).on(0).control(vec![2])
 		})
-		// H on qubit 1
-		.then(Gate::map(&Gate::h(), &[1, 0, 2]))
-		// Controlled R2: (2 -> 1)
+		.then(Gate::h().on(1))
 		.then({
-			let angle = 2.0 * PI / 4.0; // R2: 2pi / 2^2
+			let angle = 2.0 * PI / 4.0; // R2 (2 -> 1)
 			let r2 = ComplexMatrix::from(&vec![
 				vec![Complex::from(1.0), Complex::from(0.0)],
 				vec![Complex::from(0.0), Complex::from_polar(1.0, angle)],
 			]);
-			let phase_gate = Gate::from(r2);
-			Gate::map(&Gate::controlled(&phase_gate), &[2, 1, 0]) // 2 controls 1
+			Gate::from(r2).on(1).control(vec![2])
 		})
-		// H on qubit 2
-		.then(Gate::map(&Gate::h(), &[2, 1, 0]))
-		// Swap 0 <-> 2
-		.then(Gate::map(&Gate::swap(), &[0, 2, 1]));
+		.then(Gate::h().on(2))
+		.then(Gate::swap().on_qubits(vec![0, 2]));
+
+	let given_program = backend.compile(&given_circuit);
 
 	let reference_matrix = qft_matrix(3);
+	let built_circuit = qft_circuit(3);
+	let built_program = backend.compile(&built_circuit);
+
+	dbg!(&built_circuit);
+	dbg!(&given_circuit);
+	assert!(built_circuit == given_circuit);
 
 	dbg!(&reference_matrix);
-	dbg!(&circuit.as_matrix().unwrap());
-	assert!(reference_matrix.approx_eq(&circuit.as_matrix().unwrap(), 1e-6));
+	dbg!(&built_program.as_matrix().unwrap());
+	dbg!(&given_program.as_matrix().unwrap());
+	assert!(reference_matrix.approx_eq(&given_program.as_matrix().unwrap(), 1e-6));
+	assert!(reference_matrix.approx_eq(&built_program.as_matrix().unwrap(), 1e-6));
 }
 
 #[test]
 fn qft() {
 	let frequency = 5;
+	let backend = DenseCPUBackend;
 
 	for nb_qubits in 4..=8 {
 		let dimension = 2_usize.pow(nb_qubits as u32);
 
 		// Check if circuit and matrix match
 		let circuit = qft_circuit(nb_qubits);
+		let circuit = backend.compile(&circuit);
 		let matrix = qft_matrix(nb_qubits as u32);
+		dbg!(&circuit);
 		dbg!(&matrix);
 		dbg!(&circuit.as_matrix().unwrap());
 		assert!(matrix.approx_eq(&circuit.as_matrix().unwrap(), 1e-6));
