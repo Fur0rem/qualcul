@@ -16,6 +16,10 @@ impl Gate {
 		&self.op
 	}
 
+	pub fn none() -> Self {
+		Self::from(ComplexMatrix::identity(2))
+	}
+
 	pub fn x() -> Self {
 		Self::from(ComplexMatrix::from(&vec![
 			vec![Complex::from(0.0), Complex::from(1.0)],
@@ -162,4 +166,13 @@ impl Gate {
 			vec![Complex::from(0.0), exp_i_alpha],
 		]))
 	}
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Operation {
+	Gate(Gate),     // Quantum gate
+	Measure(usize), // Measure a qubit
+	ClassicalControl {
+		look_up_table: Vec<(Vec<(usize, u8)>, Gate)>, // Gates to apply based on classical bits
+	},
 }

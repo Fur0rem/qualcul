@@ -7,10 +7,10 @@ use qualcul::{
 
 #[test]
 fn epr_pair_matrix() {
-	let circuit = Circuit::new()
+	let circuit = Circuit::new(2)
 		.then(Gate::map(&Gate::h(), &[0, 1]))
 		.then(Gate::map(&Gate::controlled(&Gate::x()), &[0, 1]));
-	let matrix = circuit.as_matrix();
+	let matrix = circuit.as_matrix().unwrap();
 
 	let mut expected_matrix = ComplexMatrix::zero(4);
 	expected_matrix[(0, 0)] = Complex::from(1.0);
@@ -28,7 +28,7 @@ fn epr_pair_matrix() {
 
 #[test]
 fn epr_pair_run() {
-	let circuit = Circuit::new()
+	let circuit = Circuit::new(2)
 		.then(Gate::map(&Gate::h(), &[0, 1]))
 		.then(Gate::map(&Gate::controlled(&Gate::x()), &[0, 1]));
 	let initial_state = StateVector::from_ket(&Ket::base(0b00, 4));
@@ -44,7 +44,7 @@ fn ghz_n_run() {
 
 		// h on qubit 0
 		let mappings: Vec<_> = (0..=n).collect();
-		let mut circuit = Circuit::new().then(Gate::map(&Gate::h(), &mappings));
+		let mut circuit = Circuit::new(n + 1).then(Gate::map(&Gate::h(), &mappings));
 
 		// cx with qubit i controlling qubit i+1
 		for i in 0..n {
