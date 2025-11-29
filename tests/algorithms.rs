@@ -42,7 +42,7 @@ fn quantum_teleportation() {
 		let bob_qubit = Ket::base(0b0, 2);
 
 		let initial_state = StateVector::from_qubits(&[&alice_qubit, &shared_qubit, &bob_qubit]);
-		let final_state = circuit.run(initial_state);
+		let final_state = circuit.run(&initial_state);
 
 		let bob_new_qubit = final_state.extract_state_of_single_qubit(2);
 
@@ -111,7 +111,7 @@ fn z_error_correction() {
 		let q3 = Ket::base(0b0, 2);
 		let q4 = Ket::base(0b0, 2);
 		let initial_state = StateVector::from_qubits(&[&q0, &q1, &q2, &q3, &q4]);
-		let final_state = circuit.run(initial_state);
+		let final_state = circuit.run(&initial_state);
 		let recovered_q0 = final_state.extract_state_of_single_qubit(0);
 		dbg!(&q0);
 		dbg!(&recovered_q0);
@@ -254,7 +254,7 @@ fn qft() {
 		dbg!(&state);
 
 		// Check if the final state gives the closest frequency
-		let final_state = circuit.run(state);
+		let final_state = circuit.run(&state);
 		let found_frequency = 2_usize.pow(nb_qubits as u32) as f64 / final_state.most_likely_outcome() as f64;
 		dbg!(&final_state);
 		dbg!(&found_frequency);

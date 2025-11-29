@@ -70,5 +70,5 @@ pub fn qft_circuit(nb_qubits: usize) -> Circuit {
 		circuit = circuit.then(Gate::map(&Gate::swap(), &mapping));
 	}
 
-	circuit
+	return circuit;
 }

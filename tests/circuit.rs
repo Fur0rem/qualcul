@@ -32,7 +32,7 @@ fn epr_pair_run() {
 		.then(Gate::map(&Gate::h(), &[0, 1]))
 		.then(Gate::map(&Gate::controlled(&Gate::x()), &[0, 1]));
 	let initial_state = StateVector::from_ket(&Ket::base(0b00, 4));
-	let final_state = circuit.run(initial_state);
+	let final_state = circuit.run(&initial_state);
 	let expected_state = StateVector::from_ket(&Ket::bell_phi_plus());
 	assert!(final_state.approx_eq(&expected_state, 1e-6));
 }
@@ -61,7 +61,7 @@ fn ghz_n_run() {
 		let initial_state = StateVector::from_ket(&ket_0s);
 		dbg!(&initial_state);
 
-		let final_state = circuit.run(initial_state);
+		let final_state = circuit.run(&initial_state);
 		let expected_state = StateVector::from_ket(&Ket::add_and_normalize(&ket_0s, &ket_1s));
 		dbg!(&final_state);
 		dbg!(&expected_state);

@@ -109,6 +109,19 @@ impl std::ops::Mul<StateVector> for ComplexMatrix {
 	}
 }
 
+impl std::ops::Mul<&StateVector> for ComplexMatrix {
+	type Output = StateVector;
+	fn mul(self, rhs: &StateVector) -> Self::Output {
+		let mut result = StateVector(vec![Complex::from(0.0); rhs.0.len()]);
+		for i in 0..self.size_side() {
+			for j in 0..self.size_side() {
+				result.0[i] += self[(i, j)] * rhs.0[j];
+			}
+		}
+		return result;
+	}
+}
+
 impl std::ops::Index<usize> for StateVector {
 	type Output = Complex<f64>;
 
@@ -166,7 +179,7 @@ impl Circuit {
 		return Some(matrix);
 	}
 
-	fn run_only_gates(state: StateVector, operations: &[Gate], nb_qubits: usize) -> StateVector {
+	fn run_only_gates(state: &StateVector, operations: &[Gate], nb_qubits: usize) -> StateVector {
 		let mut operation_matrix = ComplexMatrix::identity(2usize.pow(nb_qubits as u32));
 		for op in operations {
 			operation_matrix = op.as_matrix() * &operation_matrix;
@@ -176,7 +189,7 @@ impl Circuit {
 
 	// State vector implementation
 	pub fn run_and_branch(
-		steps: &[Operation], initial_state: StateVector, bit_values: &[(usize, u8)], nb_qubits: usize,
+		steps: &[Operation], initial_state: &StateVector, bit_values: &[(usize, u8)], nb_qubits: usize,
 	) -> StateVector {
 		// Find how much you can simulate without needing measurement nor classical interactions
 		let mut gate_operations = Vec::new();
@@ -236,7 +249,7 @@ impl Circuit {
 			for (bit_value, probability, middle_state) in outcomes {
 				let mut bit_values: Vec<_> = bit_values.iter().map(|x| *x).collect();
 				bit_values.push((on_qubit, bit_value));
-				let final_state = Self::run_and_branch(remaining_operations, middle_state, &bit_values, nb_qubits);
+				let final_state = Self::run_and_branch(remaining_operations, &middle_state, &bit_values, nb_qubits);
 				for i in 0..final_state.0.len() {
 					combined_outcomes[i] += probability * final_state[i];
 				}
@@ -280,7 +293,18 @@ impl Circuit {
 		panic!("Operation was neither Gate nor Measure nor ClassicalControl");
 	}
 
-	pub fn run(&self, initial_state: StateVector) -> StateVector {
+	pub fn run(&self, initial_state: &StateVector) -> StateVector {
 		return Self::run_and_branch(&self.steps, initial_state, &[], self.nb_qubits);
+	}
+
+	pub fn from_matrix(matrix: ComplexMatrix) -> Self {
+		let dimension: usize = matrix.size_side();
+		assert!(dimension.is_power_of_two(), "matrix must be 2^n x 2^n");
+		let nb_qubits = dimension.trailing_zeros() as usize;
+
+		return Self {
+			steps: vec![Operation::Gate(Gate::from(matrix))],
+			nb_qubits,
+		};
 	}
 }
