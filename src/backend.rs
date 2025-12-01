@@ -9,3 +9,4 @@ pub trait Program {
 }
 
 pub mod dense_cpu;
+pub mod dense_gpu;
