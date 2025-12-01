@@ -1,8 +1,8 @@
 use num::{Complex, Zero};
 
 use crate::{
-	ComplexMatrix, Gate, GateOperation,
-	backend::{Backend, Program},
+	ComplexMatrix, GateOperation,
+	backend::{Backend, BackendOperation, LookupTable, Program},
 	circuit::{Circuit, StateVector},
 	gates,
 };
@@ -11,59 +11,8 @@ use crate::{
 pub struct DenseCPUBackend;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct MatrixLookupTable {
-	table: Vec<(Vec<(usize, u8)>, ComplexMatrix)>,
-}
-
-impl MatrixLookupTable {
-	pub fn get(&self, bit_values: &[(usize, u8)]) -> Option<&ComplexMatrix> {
-		let mut gate_to_apply = None;
-		for (conditions, gate) in &self.table {
-			let mut all_conditions_met = true;
-			for (bit_idx, expected_value) in conditions {
-				let mut found = false;
-				for (known_bit_idx, known_value) in bit_values {
-					if bit_idx == known_bit_idx {
-						if expected_value != known_value {
-							all_conditions_met = false;
-						}
-						found = true;
-						break;
-					}
-				}
-				if !found {
-					all_conditions_met = false;
-				}
-			}
-			if all_conditions_met {
-				gate_to_apply = Some(gate);
-			}
-		}
-		return gate_to_apply;
-	}
-
-	pub fn from(look_up_table: &Vec<(Vec<(usize, u8)>, GateOperation)>, nb_qubits: usize) -> Self {
-		let mut table = Vec::new();
-		for (values, gate) in look_up_table {
-			let matrix = as_matrix(&gate, nb_qubits);
-			table.push((values.clone(), matrix));
-		}
-		return Self { table };
-	}
-}
-
-#[derive(Debug, Clone, PartialEq)]
-enum BackendOperation {
-	Matrix(ComplexMatrix), // Apply complex matrix operator
-	Measure(usize),        // Measure a qubit
-	ClassicalControl {
-		look_up_table: MatrixLookupTable, // Gates to apply based on classical bits
-	},
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub struct DenseCPUProgram {
-	operations: Vec<BackendOperation>,
+	operations: Vec<BackendOperation<ComplexMatrix>>,
 	nb_qubits: usize,
 }
 
@@ -90,72 +39,15 @@ impl DenseCPUProgram {
 	}
 }
 
-pub fn controlled(gate: &Gate) -> Gate {
-	let size_side = gate.op.size_side() * 2;
-	let mut op = ComplexMatrix::identity(size_side);
-
-	for i in gate.op.size_side()..size_side {
-		for j in gate.op.size_side()..size_side {
-			op[(i, j)] = gate.op[(i - gate.op.size_side(), j - gate.op.size_side())];
+impl LookupTable<ComplexMatrix> {
+	pub fn from(look_up_table: &Vec<(Vec<(usize, u8)>, GateOperation)>, nb_qubits: usize) -> Self {
+		let mut table = Vec::new();
+		for (values, gate) in look_up_table {
+			let matrix = gates::as_matrix(&gate, nb_qubits);
+			table.push((values.clone(), matrix));
 		}
+		return Self { table };
 	}
-
-	return Gate::from(op);
-}
-
-pub fn map(gate: &Gate, mappings: &[usize]) -> Gate {
-	assert!(!mappings.is_empty());
-
-	// Turn the matrix into a full one by filling identity on the unmapped qubits
-	let id2 = ComplexMatrix::identity(2);
-	let mut gate = gate.op.clone();
-	for _ in 0..mappings.len() - (gate.size_side() as f64).log2() as usize {
-		gate = gate.kronecker_product(&id2);
-	}
-
-	// Permute the rows and columns according to the mappings
-	let nb_qubits = mappings.len();
-	let size_side = 1 << nb_qubits;
-	let mut full_op = ComplexMatrix::identity(size_side);
-	for i in 0..size_side {
-		for j in 0..size_side {
-			let mut row = 0;
-			let mut col = 0;
-			for (k, mapping) in mappings.iter().enumerate() {
-				let bit_i = (i >> (nb_qubits - 1 - k)) & 1;
-				let bit_j = (j >> (nb_qubits - 1 - k)) & 1;
-				row |= bit_i << (mappings.len() - 1 - mapping);
-				col |= bit_j << (mappings.len() - 1 - mapping);
-			}
-			full_op[(row, col)] = gate[(i, j)];
-		}
-	}
-	return Gate::from(full_op);
-}
-
-fn as_matrix(gate: &GateOperation, nb_qubits: usize) -> ComplexMatrix {
-	// Control it as many times as needed
-	let mut op = gate.op.clone();
-	for _ in 0..gate.controlled_by.len() {
-		op = controlled(&op);
-	}
-
-	// Map and permute the resulting matrix: first controls, then targets, then unaffected
-	let mut mappings = vec![];
-	for qubit in &gate.controlled_by {
-		mappings.push(*qubit);
-	}
-	for qubit in &gate.applied_on {
-		mappings.push(*qubit);
-	}
-	for q in 0..nb_qubits {
-		if !mappings.contains(&q) {
-			mappings.push(q);
-		}
-	}
-	op = map(&op, &mappings);
-
-	return op.as_matrix().clone();
 }
 
 impl Backend<DenseCPUProgram> for DenseCPUBackend {
@@ -169,14 +61,14 @@ impl Backend<DenseCPUProgram> for DenseCPUBackend {
 		for operation in circuit.steps() {
 			match operation {
 				gates::QuantumOperation::Gate(gate) => {
-					let matrix = as_matrix(&gate, nb_qubits);
+					let matrix = gates::as_matrix(&gate, nb_qubits);
 					current_matrix = matrix * &current_matrix;
 				}
 				gates::QuantumOperation::ClassicalControl { look_up_table } => {
 					operations.push(BackendOperation::Matrix(current_matrix));
 					current_matrix = ComplexMatrix::identity(dimension);
 					operations.push(BackendOperation::ClassicalControl {
-						look_up_table: MatrixLookupTable::from(&look_up_table, nb_qubits),
+						look_up_table: LookupTable::<ComplexMatrix>::from(&look_up_table, nb_qubits),
 					});
 				}
 				gates::QuantumOperation::Measure(on) => {
@@ -196,7 +88,9 @@ impl Backend<DenseCPUProgram> for DenseCPUBackend {
 }
 
 impl DenseCPUProgram {
-	fn run_and_branch(steps: &[BackendOperation], state: &StateVector, bit_values: &[(usize, u8)], nb_qubits: usize) -> StateVector {
+	fn run_and_branch(
+		steps: &[BackendOperation<ComplexMatrix>], state: &StateVector, bit_values: &[(usize, u8)], nb_qubits: usize,
+	) -> StateVector {
 		// If end of program is reached, return the calculated state
 		if steps.is_empty() {
 			return state.clone();
@@ -267,7 +161,7 @@ impl DenseCPUProgram {
 }
 
 impl Program for DenseCPUProgram {
-	fn run(&self, state: &StateVector) -> StateVector {
+	fn run(&mut self, state: &StateVector) -> StateVector {
 		return Self::run_and_branch(&self.operations, state, &[], self.nb_qubits);
 	}
 }

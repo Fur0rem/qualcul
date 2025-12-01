@@ -186,6 +186,74 @@ impl GateOperation {
 	}
 }
 
+pub fn controlled(gate: &Gate) -> Gate {
+	let size_side = gate.op.size_side() * 2;
+	let mut op = ComplexMatrix::identity(size_side);
+
+	for i in gate.op.size_side()..size_side {
+		for j in gate.op.size_side()..size_side {
+			op[(i, j)] = gate.op[(i - gate.op.size_side(), j - gate.op.size_side())];
+		}
+	}
+
+	return Gate::from(op);
+}
+
+pub fn map(gate: &Gate, mappings: &[usize]) -> Gate {
+	assert!(!mappings.is_empty());
+
+	// Turn the matrix into a full one by filling identity on the unmapped qubits
+	let id2 = ComplexMatrix::identity(2);
+	let mut gate = gate.op.clone();
+	for _ in 0..mappings.len() - (gate.size_side() as f64).log2() as usize {
+		gate = gate.kronecker_product(&id2);
+	}
+
+	// Permute the rows and columns according to the mappings
+	let nb_qubits = mappings.len();
+	let size_side = 1 << nb_qubits;
+	let mut full_op = ComplexMatrix::identity(size_side);
+	for i in 0..size_side {
+		for j in 0..size_side {
+			let mut row = 0;
+			let mut col = 0;
+			for (k, mapping) in mappings.iter().enumerate() {
+				let bit_i = (i >> (nb_qubits - 1 - k)) & 1;
+				let bit_j = (j >> (nb_qubits - 1 - k)) & 1;
+				row |= bit_i << (mappings.len() - 1 - mapping);
+				col |= bit_j << (mappings.len() - 1 - mapping);
+			}
+			full_op[(row, col)] = gate[(i, j)];
+		}
+	}
+	return Gate::from(full_op);
+}
+
+pub fn as_matrix(gate: &GateOperation, nb_qubits: usize) -> ComplexMatrix {
+	// Control it as many times as needed
+	let mut op = gate.op.clone();
+	for _ in 0..gate.controlled_by.len() {
+		op = controlled(&op);
+	}
+
+	// Map and permute the resulting matrix: first controls, then targets, then unaffected
+	let mut mappings = vec![];
+	for qubit in &gate.controlled_by {
+		mappings.push(*qubit);
+	}
+	for qubit in &gate.applied_on {
+		mappings.push(*qubit);
+	}
+	for q in 0..nb_qubits {
+		if !mappings.contains(&q) {
+			mappings.push(q);
+		}
+	}
+	op = map(&op, &mappings);
+
+	return op.as_matrix().clone();
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum QuantumOperation {
 	Gate(GateOperation), // Quantum gate

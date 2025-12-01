@@ -4,6 +4,7 @@ use num::Complex;
 use qualcul::Gate;
 use qualcul::algorithms::{qft_circuit, qft_matrix};
 use qualcul::backend::dense_cpu::DenseCPUBackend;
+use qualcul::backend::dense_gpu::DenseGPUBackend;
 use qualcul::backend::{Backend, Program};
 use qualcul::{
 	ComplexMatrix, QuantumOperation,
@@ -46,7 +47,7 @@ fn quantum_teleportation() {
 
 		let initial_state = StateVector::from_qubits(&[&alice_qubit, &shared_qubit, &bob_qubit]);
 		let backend = DenseCPUBackend;
-		let program = backend.compile(&circuit);
+		let mut program = backend.compile(&circuit);
 		let final_state = program.run(&initial_state);
 
 		let bob_new_qubit = final_state.extract_state_of_single_qubit(2);
@@ -112,7 +113,7 @@ fn z_error_correction() {
 		.then(Gate::x().on(2).control(vec![0]));
 
 	let backend = DenseCPUBackend;
-	let program = backend.compile(&circuit);
+	let mut program = backend.compile(&circuit);
 
 	for _ in 0..NB_RANDOM_TESTS {
 		let q0 = Ket::random(2);
@@ -248,19 +249,21 @@ fn qft_3_qubit() {
 #[test]
 fn qft() {
 	let frequency = 5;
-	let backend = DenseCPUBackend;
+	let cpu_backend = DenseCPUBackend;
+	let gpu_backend = DenseGPUBackend::<cubecl::wgpu::WgpuRuntime>::new();
 
 	for nb_qubits in 4..=8 {
 		let dimension = 2_usize.pow(nb_qubits as u32);
 
 		// Check if circuit and matrix match
 		let circuit = qft_circuit(nb_qubits);
-		let circuit = backend.compile(&circuit);
+		let mut cpu_program = cpu_backend.compile(&circuit);
+		let mut gpu_program = gpu_backend.compile(&circuit);
 		let matrix = qft_matrix(nb_qubits as u32);
 		dbg!(&circuit);
 		dbg!(&matrix);
-		dbg!(&circuit.as_matrix().unwrap());
-		assert!(matrix.approx_eq(&circuit.as_matrix().unwrap(), 1e-6));
+		dbg!(&cpu_program.as_matrix().unwrap());
+		assert!(matrix.approx_eq(&cpu_program.as_matrix().unwrap(), 1e-6));
 
 		// Prepare state for a wave with given frequency
 		let norm = 1.0 / (dimension as f64).sqrt();
@@ -277,7 +280,12 @@ fn qft() {
 		dbg!(&state);
 
 		// Check if the final state gives the closest frequency
-		let final_state = circuit.run(&state);
+		let final_state = cpu_program.run(&state);
+		let found_frequency = 2_usize.pow(nb_qubits as u32) as f64 / final_state.most_likely_outcome() as f64;
+		dbg!(&final_state);
+		dbg!(&found_frequency);
+		assert!(found_frequency.round_ties_even() == frequency as f64);
+		let final_state = gpu_program.run(&state);
 		let found_frequency = 2_usize.pow(nb_qubits as u32) as f64 / final_state.most_likely_outcome() as f64;
 		dbg!(&final_state);
 		dbg!(&found_frequency);

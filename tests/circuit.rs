@@ -8,9 +8,7 @@ use qualcul::{
 
 #[test]
 fn epr_pair_matrix() {
-	let circuit = Circuit::new(2)
-		.then(Gate::h().on(0))
-		.then(Gate::x().on(1).control(vec![0]));
+	let circuit = Circuit::new(2).then(Gate::h().on(0)).then(Gate::x().on(1).control(vec![0]));
 
 	let backend = DenseCPUBackend;
 	let circuit = backend.compile(&circuit);
@@ -34,12 +32,10 @@ fn epr_pair_matrix() {
 
 #[test]
 fn epr_pair_run() {
-	let circuit = Circuit::new(2)
-		.then(Gate::h().on(0))
-		.then(Gate::x().on(1).control(vec![0]));
+	let circuit = Circuit::new(2).then(Gate::h().on(0)).then(Gate::x().on(1).control(vec![0]));
 
 	let backend = DenseCPUBackend;
-	let circuit = backend.compile(&circuit);
+	let mut circuit = backend.compile(&circuit);
 
 	let initial_state = StateVector::from_ket(&Ket::base(0b00, 4));
 	let final_state = circuit.run(&initial_state);
@@ -59,7 +55,7 @@ fn ghz_n_run() {
 		}
 
 		let backend = DenseCPUBackend;
-		let circuit = backend.compile(&circuit);
+		let mut circuit = backend.compile(&circuit);
 
 		let nb_dimensions = 2 << n; // 2^(n+1)
 		let ket_0s = Ket::base(0, nb_dimensions);

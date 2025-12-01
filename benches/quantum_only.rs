@@ -21,13 +21,13 @@ fn qft_bench(c: &mut Criterion) {
 			let dimension = 2usize.pow(nb_qubits as u32);
 			let state = StateVector::from_ket(&Ket::base(0, dimension));
 
-			let circuit = DenseCPUProgram::from_matrix(qft_matrix(nb_qubits));
+			let mut circuit = DenseCPUProgram::from_matrix(qft_matrix(nb_qubits));
 
 			let id = BenchmarkId::new(*backend, nb_qubits);
 			group.bench_with_input(id, &(backend, nb_qubits), |b, _| {
 				let circuit = match *backend {
-					"backend_1" => &circuit,
-					"backend_2" => &circuit,
+					"backend_1" => &mut circuit,
+					"backend_2" => &mut circuit,
 					_ => panic!("Unknown backend"),
 				};
 
@@ -57,13 +57,13 @@ fn ghz_n_bench(c: &mut Criterion) {
 			for i in 0..nb_qubits {
 				circuit = circuit.then(Gate::x().on(i + 1).control(vec![i]));
 			}
-			let circuit = DenseCPUBackend.compile(&circuit);
+			let mut circuit = DenseCPUBackend.compile(&circuit);
 
 			let id = BenchmarkId::new(*backend, nb_qubits);
 			group.bench_with_input(id, &(backend, nb_qubits), |b, _| {
 				let circuit = match *backend {
-					"backend_1" => &circuit,
-					"backend_2" => &circuit,
+					"backend_1" => &mut circuit,
+					"backend_2" => &mut circuit,
 					_ => panic!("Unknown backend"),
 				};
 
