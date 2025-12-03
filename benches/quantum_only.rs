@@ -4,7 +4,7 @@ use qualcul::algorithms::qft_matrix;
 use qualcul::backend::dense_cpu::{DenseCPUBackend, DenseCPUProgram};
 use qualcul::backend::{Backend, Program};
 use qualcul::circuit::Circuit;
-use qualcul::{circuit::StateVector, state::Ket};
+use qualcul::state::{Ket, StateVector};
 use std::hint::black_box;
 use std::time::Duration;
 
@@ -19,7 +19,7 @@ fn qft_bench(c: &mut Criterion) {
 	for backend in backends.iter() {
 		for nb_qubits in 2..=6 {
 			let dimension = 2usize.pow(nb_qubits as u32);
-			let state = StateVector::from_ket(&Ket::base(0, dimension));
+			let state = StateVector::from_ket(Ket::base(0, dimension));
 
 			let mut circuit = DenseCPUProgram::from_matrix(qft_matrix(nb_qubits));
 
@@ -51,7 +51,7 @@ fn ghz_n_bench(c: &mut Criterion) {
 	for backend in backends.iter() {
 		for nb_qubits in 2..=8 {
 			let nb_dimensions = 2 << nb_qubits; // 2^(n+1)
-			let state = StateVector::from_ket(&Ket::random(nb_dimensions));
+			let state = StateVector::from_ket(Ket::random(nb_dimensions));
 
 			let mut circuit = Circuit::new(nb_qubits + 1).then(Gate::h().on(0));
 			for i in 0..nb_qubits {

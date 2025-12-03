@@ -1,9 +1,16 @@
+//! Some common quantum algorithms.
+
 use std::f64::consts::PI;
 
 use num::{Complex, One};
 
 use crate::{ComplexMatrix, Gate, circuit::Circuit};
 
+/// Creates a matrix representing the Quantum Fourier Transform algorithm.
+///
+/// # Arguments
+///
+/// * `nb_qubits` - The number of qubits the algorithm will run on.
 pub fn qft_matrix(nb_qubits: u32) -> ComplexMatrix {
 	let dimension = 2_usize.pow(nb_qubits);
 	let omega = Complex::from_polar(1.0, 2.0 * PI / (dimension as f64));
@@ -22,6 +29,11 @@ pub fn qft_matrix(nb_qubits: u32) -> ComplexMatrix {
 	return matrix;
 }
 
+/// Creates a circuit of the Quantum Fourier Transform algorithm.
+///
+/// # Arguments
+///
+/// * `nb_qubits` - The number of qubits the algorithm will run on.
 pub fn qft_circuit(nb_qubits: usize) -> Circuit {
 	let mut circuit = Circuit::new(nb_qubits);
 

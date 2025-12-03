@@ -8,7 +8,7 @@ fn controlled_0_controls_1() {
 	expected_cx[(1, 1)] = Complex::from(1.0);
 	expected_cx[(2, 3)] = Complex::from(1.0);
 	expected_cx[(3, 2)] = Complex::from(1.0);
-	let cx = Gate::x().on(1).control(vec![0]).into_matrix();
+	let cx = Gate::x().on(1).control(vec![0]).into_matrix(2);
 
 	dbg!(&cx);
 	dbg!(&expected_cx);
@@ -17,8 +17,8 @@ fn controlled_0_controls_1() {
 
 #[test]
 fn controlled_1_controls_0() {
-	let cx = Gate::x().on(1).control(vec![0]).into_matrix();
-	let reverse_cx = Gate::x().on(0).control(vec![1]).into_matrix();
+	let cx = Gate::x().on(1).control(vec![0]).into_matrix(2);
+	let reverse_cx = Gate::x().on(0).control(vec![1]).into_matrix(2);
 
 	let mut expected_reverse_cx = ComplexMatrix::zero(4);
 	expected_reverse_cx[(0, 0)] = Complex::from(1.0);
@@ -53,7 +53,7 @@ fn controlled_0_controls_2() {
 	expected_cx[(7, 6)] = Complex::from(1.0);
 	expected_cx[(6, 7)] = Complex::from(1.0);
 
-	let cx = Gate::x().on(2).control(vec![0]).into_matrix();
+	let cx = Gate::x().on(2).control(vec![0]).into_matrix(3);
 
 	dbg!(&cx);
 	dbg!(&expected_cx);
@@ -73,7 +73,7 @@ fn controlled_2_controls_0() {
 	expected_cx[(6, 6)] = Complex::from(1.0);
 	expected_cx[(7, 3)] = Complex::from(1.0);
 
-	let cx = Gate::x().on(0).control(vec![2]).into_matrix();
+	let cx = Gate::x().on(0).control(vec![2]).into_matrix(3);
 
 	dbg!(&cx);
 	dbg!(&expected_cx);
@@ -87,7 +87,7 @@ fn ccx() {
 	expected_ccx[(7, 6)] = Complex::from(1.0);
 	expected_ccx[(6, 6)] = Complex::from(0.0);
 	expected_ccx[(7, 7)] = Complex::from(0.0);
-	let ccx = Gate::x().on(2).control(vec![0, 1]).into_matrix();
+	let ccx = Gate::x().on(2).control(vec![0, 1]).into_matrix(3);
 	assert!(ccx.approx_eq(&expected_ccx, 1e-6));
 }
 
@@ -98,7 +98,7 @@ fn fredkin() {
 	expected_fredkin[(6, 5)] = Complex::from(1.0);
 	expected_fredkin[(5, 5)] = Complex::from(0.0);
 	expected_fredkin[(6, 6)] = Complex::from(0.0);
-	let fredkin = Gate::swap().on_qubits(vec![1, 2]).control(vec![0]).into_matrix();
+	let fredkin = Gate::swap().on_qubits(vec![1, 2]).control(vec![0]).into_matrix(3);
 	assert!(fredkin.approx_eq(&expected_fredkin, 1e-6));
 }
 

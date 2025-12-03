@@ -2,8 +2,8 @@ use num::Complex;
 use qualcul::{
 	ComplexMatrix, Gate,
 	backend::{Backend, Program, dense_cpu::DenseCPUBackend},
-	circuit::{Circuit, StateVector},
-	state::Ket,
+	circuit::Circuit,
+	state::{Ket, StateVector},
 };
 
 #[test]
@@ -37,9 +37,9 @@ fn epr_pair_run() {
 	let backend = DenseCPUBackend;
 	let mut circuit = backend.compile(&circuit);
 
-	let initial_state = StateVector::from_ket(&Ket::base(0b00, 4));
+	let initial_state = StateVector::from_ket(Ket::base(0b00, 4));
 	let final_state = circuit.run(&initial_state);
-	let expected_state = StateVector::from_ket(&Ket::bell_phi_plus());
+	let expected_state = StateVector::from_ket(Ket::bell_phi_plus());
 	assert!(final_state.approx_eq(&expected_state, 1e-6));
 }
 
@@ -61,11 +61,11 @@ fn ghz_n_run() {
 		let ket_0s = Ket::base(0, nb_dimensions);
 		let ket_1s = Ket::base((2 << n) - 1, nb_dimensions);
 
-		let initial_state = StateVector::from_ket(&ket_0s);
+		let initial_state = StateVector::from_ket(ket_0s.clone());
 		dbg!(&initial_state);
 
 		let final_state = circuit.run(&initial_state);
-		let expected_state = StateVector::from_ket(&Ket::add_and_normalize(&ket_0s, &ket_1s));
+		let expected_state = StateVector::from_ket(Ket::add_and_normalize(&ket_0s, &ket_1s));
 		dbg!(&final_state);
 		dbg!(&expected_state);
 		assert!(final_state.approx_eq(&expected_state, 1e-6));

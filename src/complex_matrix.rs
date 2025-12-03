@@ -1,8 +1,14 @@
+//! Matrices of complex numbers and common operations on them.
+
 use num::{Complex, complex::ComplexFloat};
 
+/// A square matrix of complex numbers.
 #[derive(Clone, PartialEq, Default)]
 pub struct ComplexMatrix {
+	/// The values of the matrix, linearized.
 	values: Vec<Complex<f64>>,
+
+	/// The size of the side of the matrix.
 	size_side: usize,
 }
 
@@ -20,6 +26,11 @@ impl std::fmt::Debug for ComplexMatrix {
 }
 
 impl ComplexMatrix {
+	/// Creates a matrix of only 0's with the specified size.
+	///
+	/// # Arguments
+	///
+	/// * `size_side` The size of the side of the matrix.
 	pub fn zero(size_side: usize) -> Self {
 		Self {
 			values: vec![Complex::new(0.0, 0.0); size_side * size_side],
@@ -27,6 +38,12 @@ impl ComplexMatrix {
 		}
 	}
 
+	/// Creates a matrix from a 2 dimensional vector.
+	/// All inner vectors should have length of `n` where `n` is the number of inner vectors.
+	///
+	/// # Arguments
+	///
+	/// * `values` - The values of the matrix, each inner vector is a row.
 	pub fn from(values: &Vec<Vec<Complex<f64>>>) -> Self {
 		let size_side = values.len();
 		for row in values {
@@ -43,10 +60,16 @@ impl ComplexMatrix {
 		return result;
 	}
 
+	/// Gets the size of the side of the matrix.
 	pub fn size_side(&self) -> usize {
 		self.size_side
 	}
 
+	/// Creates an identity matrix with the specified size.
+	///
+	/// # Arguments
+	///
+	/// * `size_side` - The size of the side of the matrix.
 	pub fn identity(size_side: usize) -> Self {
 		let mut result = ComplexMatrix::zero(size_side);
 
@@ -177,6 +200,8 @@ impl std::ops::Mul<Complex<f64>> for &ComplexMatrix {
 }
 
 impl ComplexMatrix {
+	/// Computes the transpose of the matrix.
+	/// The transpose of a matrix is a matrix where all the original elements are mirrored along the diagonal.
 	pub fn transpose(&self) -> Self {
 		let mut result = Self::zero(self.size_side);
 
@@ -189,6 +214,8 @@ impl ComplexMatrix {
 		return result;
 	}
 
+	/// Computes the conjugate of the matrix.
+	/// The conjugate of a matrix is a matrix where all the elements are the conjugates of the original elements.
 	pub fn conjugate(&self) -> Self {
 		let mut result = Self::zero(self.size_side);
 
@@ -201,10 +228,17 @@ impl ComplexMatrix {
 		return result;
 	}
 
+	/// Computes the adjoint of the matrix.
+	/// The adjoint of a matrix is the [conjugate](Self::conjugate) of the [transpose](Self::transpose) of the original matrix.
 	pub fn adjoint(&self) -> Self {
 		return self.conjugate().transpose();
 	}
 
+	/// Computes the kronecker product of 2 matrices.
+	///
+	/// # Arguments
+	///
+	/// * `rhs` - Right-hand side expression, the other matrix to compute the kronecker product with.
 	pub fn kronecker_product(&self, rhs: &Self) -> Self {
 		let mut result = ComplexMatrix::zero(self.size_side() * rhs.size_side());
 		for i in 0..self.size_side() {
@@ -219,6 +253,12 @@ impl ComplexMatrix {
 		return result;
 	}
 
+	/// Checks whether 2 matrices are approximately equal given an error threshold.
+	///
+	/// # Arguments
+	///
+	/// * `rhs` - The other matrix to compare with.
+	/// * `epsilon` - The margin of error tolerated between 2 elements.
 	pub fn approx_eq(&self, rhs: &Self, epsilon: f64) -> bool {
 		if self.size_side() != rhs.size_side() {
 			return false;
@@ -235,6 +275,12 @@ impl ComplexMatrix {
 		return true;
 	}
 
+	/// Computes an (approximate) exponential of the matrix.
+	/// Since the formula for the exponential of a matrix needs is an infinite sum, the computation is truncated.
+	///
+	/// # Arguments
+	///
+	/// * `nb_terms` - The number of terms in the sum.
 	pub fn exp(&self, nb_terms: usize) -> Self {
 		let mut sum = ComplexMatrix::identity(self.size_side());
 		let mut current_power = ComplexMatrix::identity(self.size_side());

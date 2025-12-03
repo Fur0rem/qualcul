@@ -6,6 +6,7 @@ tab_spaces = 8
 
 fn_params_layout = "Compressed"
 control_brace_style = "ClosingNextLine"
+imports_layout = "Mixed"
 
 enum_discrim_align_threshold = 30
 struct_field_align_threshold = 30

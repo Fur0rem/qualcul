@@ -6,11 +6,8 @@ use qualcul::algorithms::{qft_circuit, qft_matrix};
 use qualcul::backend::dense_cpu::DenseCPUBackend;
 use qualcul::backend::dense_gpu::DenseGPUBackend;
 use qualcul::backend::{Backend, Program};
-use qualcul::{
-	ComplexMatrix, QuantumOperation,
-	circuit::{Circuit, StateVector},
-	state::Ket,
-};
+use qualcul::state::{Ket, StateVector};
+use qualcul::{ComplexMatrix, QuantumOperation, circuit::Circuit};
 
 const NB_RANDOM_TESTS: usize = 20;
 
